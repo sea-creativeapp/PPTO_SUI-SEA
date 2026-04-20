@@ -3,11 +3,11 @@ import pandas as pd
 import json
 from datetime import datetime
 import random
-import plotly.graph_objects as go   # ← CORRECCIÓN AQUÍ
+import plotly.graph_objects as go
 
 st.set_page_config(page_title="Presupuesto SSPD v3 - SEA", layout="wide", page_icon="📊")
 
-# ==================== DATOS BASE ====================
+# ===================== DATOS BASE =====================
 MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
 MATERIALES = [
@@ -45,10 +45,7 @@ MUNICIPIOS = [
 if 'month_params' not in st.session_state:
     st.session_state.month_params = {}
     for m in range(12):
-        st.session_state.month_params[m] = [
-            {"id": mat["id"], "ton": mat["histTon"], "precio": mat["precio"], "nFact": mat["histFact"]}
-            for mat in MATERIALES
-        ]
+        st.session_state.month_params[m] = [{"id": mat["id"], "ton": mat["histTon"], "precio": mat["precio"], "nFact": mat["histFact"]} for mat in MATERIALES]
 
 if 'generated_data' not in st.session_state:
     st.session_state.generated_data = {}
@@ -71,7 +68,7 @@ def generate_month(month_idx):
 
     for mat in MATERIALES:
         p = next((x for x in params if x["id"] == mat["id"]), None)
-        if not p or p["nFact"] <= 0: continue
+        if not p or p.get("nFact", 0) <= 0: continue
         total_kg = int(p["ton"] * 1000)
         n_fact = p["nFact"]
 
@@ -119,10 +116,13 @@ def generate_month(month_idx):
                     kg_left -= kg_mu
 
     st.session_state.generated_data[month_idx] = {"facturas": facturas, "sspd": sspd_rows}
-    st.success(f"✅ Mes {MONTHS[month_idx]} 2026 generado correctamente")
+    st.success(f"✅ Mes {MONTHS[month_idx]} generado correctamente")
     st.rerun()
 
-# ==================== TABS ====================
+# ==================== INTERFAZ ====================
+st.title("Presupuesto de Facturación SSPD v3")
+st.subheader("Servicios Empresariales de Aseo S.A.S E.S.P. — Valle del Cauca")
+
 tab_pres, tab_fact, tab_sspd, tab_muni, tab_proj, tab_cargas = st.tabs([
     "📊 Presupuesto", "📄 Facturas generadas", "📋 Distribución SSPD",
     "🏙️ Parámetros municipios", "📈 Proyección 12M", "📥 Cargas & Configuración"
@@ -132,7 +132,7 @@ with tab_pres:
     st.subheader(f"Presupuesto — {MONTHS[st.session_state.current_month]} 2026")
     params = st.session_state.month_params[st.session_state.current_month]
     total_ton = sum(p["ton"] for p in params)
-    total_val = sum(p["ton"]*1000*p["precio"]*(1.19 if next(m for m in MATERIALES if m["id"]==p["id"])["iva"] else 1) for p in params)
+    total_val = sum(p["ton"]*1000*p["precio"]*(1.19 if next((m for m in MATERIALES if m["id"]==p["id"]), {"iva":False})["iva"] else 1) for p in params)
 
     col1, col2, col3 = st.columns(3)
     col1.metric("Toneladas objetivo", fmt_ton(total_ton))
@@ -140,10 +140,8 @@ with tab_pres:
     col3.metric("Facturas est.", sum(p["nFact"] for p in params))
 
     df = pd.DataFrame(params)
-    df["Material"] = [next(m["interno"] for m in MATERIALES if m["id"] == pid) for pid in df["id"]]
-    edited = st.data_editor(df[["Material","ton","precio","nFact"]], use_container_width=True, hide_index=True,
-                            column_config={"ton": st.column_config.NumberColumn("Ton", format="%.1f"),
-                                           "precio": st.column_config.NumberColumn("Precio/kg $", format="$%.0f")})
+    df["Material"] = [m["interno"] for m in MATERIALES]
+    edited = st.data_editor(df[["Material","ton","precio","nFact"]], use_container_width=True, hide_index=True)
     for i, row in edited.iterrows():
         st.session_state.month_params[st.session_state.current_month][i].update({"ton": float(row["ton"]), "precio": int(row["precio"]), "nFact": int(row["nFact"])})
 
@@ -154,9 +152,8 @@ with tab_fact:
     st.subheader("Facturas generadas")
     data = st.session_state.generated_data.get(st.session_state.current_month)
     if data:
-        df_fact = pd.DataFrame(data["facturas"])
-        st.dataframe(df_fact, use_container_width=True)
-        st.download_button("⬇ Exportar Facturas CSV", df_fact.to_csv(index=False, sep=";"), f"Facturas_{MONTHS[st.session_state.current_month]}.csv", "text/csv")
+        st.dataframe(pd.DataFrame(data["facturas"]), use_container_width=True)
+        st.download_button("⬇ Exportar Facturas CSV", pd.DataFrame(data["facturas"]).to_csv(index=False, sep=";"), f"Facturas_{MONTHS[st.session_state.current_month]}.csv", "text/csv")
     else:
         st.info("Genera el mes primero")
 
@@ -164,9 +161,8 @@ with tab_sspd:
     st.subheader("Distribución SSPD")
     data = st.session_state.generated_data.get(st.session_state.current_month)
     if data:
-        df_sspd = pd.DataFrame(data["sspd"])
-        st.dataframe(df_sspd, use_container_width=True)
-        st.download_button("⬇ Exportar Reporte SSPD CSV", df_sspd.to_csv(index=False, sep=";"), f"Reporte_SSPD_{MONTHS[st.session_state.current_month]}.csv", "text/csv")
+        st.dataframe(pd.DataFrame(data["sspd"]), use_container_width=True)
+        st.download_button("⬇ Exportar Reporte SSPD CSV", pd.DataFrame(data["sspd"]).to_csv(index=False, sep=";"), f"Reporte_SSPD_{MONTHS[st.session_state.current_month]}.csv", "text/csv")
     else:
         st.info("Genera el mes primero")
 
@@ -206,8 +202,7 @@ with tab_cargas:
     st.subheader("💾 Portabilidad entre equipos")
     colA, colB = st.columns(2)
     with colA:
-        export_data = {"month_params": st.session_state.month_params, "generated_data": st.session_state.generated_data,
-                       "current_month": st.session_state.current_month, "base_tons": st.session_state.base_tons, "munis": MUNICIPIOS}
+        export_data = {"month_params": st.session_state.month_params, "generated_data": st.session_state.generated_data, "current_month": st.session_state.current_month, "base_tons": st.session_state.base_tons, "munis": MUNICIPIOS}
         st.download_button("📤 Exportar TODO como JSON", json.dumps(export_data, indent=2), f"SEA_Presupuesto_{datetime.now().strftime('%Y%m%d')}.json", "application/json")
     with colB:
         json_file = st.file_uploader("📥 Importar JSON", type="json")
@@ -219,4 +214,4 @@ with tab_cargas:
             st.session_state.base_tons = imported.get("base_tons", st.session_state.base_tons)
             st.success("✅ Configuración importada correctamente")
 
-st.caption("✅ Presupuesto de Facturación SSPD v3 completa — Servicios Empresariales de Aseo S.A.S E.S.P. | Normativa SSPD")
+st.caption("✅ Presupuesto de Facturación SSPD v3 completa — Servicios Empresariales de Aseo S.A.S E.S.P. | Normativa Superintendencia de Servicios Públicos")
