@@ -3,6 +3,7 @@ import pandas as pd
 import json
 from datetime import datetime
 import random
+import plotly.graph_objects as go   # ← CORRECCIÓN AQUÍ
 
 st.set_page_config(page_title="Presupuesto SSPD v3 - SEA", layout="wide", page_icon="📊")
 
@@ -127,7 +128,6 @@ tab_pres, tab_fact, tab_sspd, tab_muni, tab_proj, tab_cargas = st.tabs([
     "🏙️ Parámetros municipios", "📈 Proyección 12M", "📥 Cargas & Configuración"
 ])
 
-# TAB 1 - PRESUPUESTO
 with tab_pres:
     st.subheader(f"Presupuesto — {MONTHS[st.session_state.current_month]} 2026")
     params = st.session_state.month_params[st.session_state.current_month]
@@ -150,7 +150,6 @@ with tab_pres:
     if st.button("🚀 Generar este mes", type="primary", use_container_width=True):
         generate_month(st.session_state.current_month)
 
-# TAB 2 - FACTURAS
 with tab_fact:
     st.subheader("Facturas generadas")
     data = st.session_state.generated_data.get(st.session_state.current_month)
@@ -159,9 +158,8 @@ with tab_fact:
         st.dataframe(df_fact, use_container_width=True)
         st.download_button("⬇ Exportar Facturas CSV", df_fact.to_csv(index=False, sep=";"), f"Facturas_{MONTHS[st.session_state.current_month]}.csv", "text/csv")
     else:
-        st.info("Genera el mes primero usando el botón en la pestaña Presupuesto")
+        st.info("Genera el mes primero")
 
-# TAB 3 - SSPD
 with tab_sspd:
     st.subheader("Distribución SSPD")
     data = st.session_state.generated_data.get(st.session_state.current_month)
@@ -172,7 +170,6 @@ with tab_sspd:
     else:
         st.info("Genera el mes primero")
 
-# TAB 4 - MUNICIPIOS
 with tab_muni:
     st.subheader("Parámetros de distribución municipal")
     muni_df = pd.DataFrame(MUNICIPIOS)
@@ -180,7 +177,6 @@ with tab_muni:
     for i, row in edited_muni.iterrows():
         MUNICIPIOS[i]["pct"] = float(row["pct"])
 
-# TAB 5 - PROYECCIÓN
 with tab_proj:
     st.subheader("Proyección anual 2026")
     ton_data = [sum(p["ton"] for p in st.session_state.month_params[m]) for m in range(12)]
@@ -188,7 +184,6 @@ with tab_proj:
     fig.add_bar(x=MONTHS, y=ton_data, name="Toneladas", marker_color="#4ade80")
     st.plotly_chart(fig, use_container_width=True)
 
-# TAB 6 - CARGAS & CONFIGURACIÓN
 with tab_cargas:
     st.subheader("📥 Cargas Históricas y Configuración")
     col1, col2, col3 = st.columns(3)
@@ -222,6 +217,6 @@ with tab_cargas:
             st.session_state.generated_data = imported.get("generated_data", st.session_state.generated_data)
             st.session_state.current_month = imported.get("current_month", st.session_state.current_month)
             st.session_state.base_tons = imported.get("base_tons", st.session_state.base_tons)
-            st.success("✅ Configuración importada")
+            st.success("✅ Configuración importada correctamente")
 
-st.caption("✅ Presupuesto de Facturación SSPD v3 completa — Servicios Empresariales de Aseo S.A.S E.S.P. | Normativa Superintendencia de Servicios Públicos")
+st.caption("✅ Presupuesto de Facturación SSPD v3 completa — Servicios Empresariales de Aseo S.A.S E.S.P. | Normativa SSPD")
